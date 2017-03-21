@@ -25,23 +25,15 @@ public class FileService {
 			Files.createDirectory(dir);
 	}
 	
-	public static String getExtension(String filename) {
-		int dot = filename.lastIndexOf('.');
-		String ext = "";
-		if (dot > -1)
-			ext = filename.substring(dot);
-		return ext;
-	}
-	
 	public void save(MultipartFile file, Long id) throws IOException {
 		Files.copy(file.getInputStream(), dir.resolve(id.toString()), StandardCopyOption.REPLACE_EXISTING);
 	}
 	
 	public Resource getResource(Long id) throws MalformedURLException {
-		return new UrlResource(fileExists(id).toUri());
+		return new UrlResource(exists(id).toUri());
 	}
 
-	public Path fileExists(Long id) {
+	public Path exists(Long id) {
 		Path path = dir.resolve(id.toString());
 		if (!Files.exists(path))
 			throw new FileNotFoundException("File '" + path + "' not found");

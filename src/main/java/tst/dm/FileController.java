@@ -27,56 +27,59 @@ import org.springframework.web.multipart.MultipartFile;
 @RestController
 @RequestMapping("/api")
 public class FileController {
-
-	@Autowired
-	private FileRepo repo;
 	
 	@Autowired
 	FileService files;
+
+	@Autowired
+	MetaService meta;
 	
 	@PostMapping(value={ "/", "/{id}" }, consumes="multipart/form-data")
-	Object upload(@PathVariable Optional<Long> id,
+	ResponseEntity<?> upload(@PathVariable Optional<Long> id,
 			@RequestPart(name="file") MultipartFile file,
 			@RequestPart(name="author") Optional<String> author,
 			@RequestPart(name="created") Optional<String> created) throws URISyntaxException, IOException {
 		if (file == null || file.isEmpty())
-			throw new FileNotFoundException("File not uploaded");
+			throw new FileIsEmptyException("File not uploaded");
 		FileEntity ent = id.map(val -> {
-			files.fileExists(val);
-			return findMeta(val);
+			files.exists(val);
+			return meta.exists(val);
 		}).orElse(new FileEntity());
 		ent.author = author.orElse(null);
 		ent.created = created.isPresent() ? Timestamp.valueOf(LocalDateTime.parse(created.get())) : null;
 		ent.contentType = file.getContentType();
 		ent.filename = file.getOriginalFilename();
-		Long _id = repo.save(ent).id;
+		FileEntity _ent = meta.save(ent);
+		Long _id = _ent.id;
 		files.save(file, _id);
-		return new Object() {
-			public URI uri = new URI("/api/" + _id); // ServletUriComponentsBuilder.fromCurrentRequest().path("/api/{id}").buildAndExpand(_id).toUri();
-		};
+		return ResponseEntity.status(id.isPresent() ? /*Found*/302 : /*Created*/201)
+				.header(HttpHeaders.LOCATION, "/api/" + _id)
+				.body(new Object() {
+					public URI uri = new URI("/api/" + _id); // ServletUriComponentsBuilder.fromCurrentRequest().path("/api/{id}").buildAndExpand(_id).toUri();
+				});
 	}
 	
 	@GetMapping("/{id}")
-	FileEntity meta(@PathVariable Long id) {
-		return findMeta(id);
-	}
-
-	private FileEntity findMeta(Long id) {
-		FileEntity ent = repo.findOne(id);
-		if (ent == null)
-			throw new FileNotFoundException("Meta info for id='" + id + "' not found");
-		return ent;
+	FileEntity metaData(@PathVariable Long id) {
+		return meta.exists(id);
 	}
 	
 	@GetMapping("/{id}/stream")
 	public ResponseEntity<Resource> stream(@PathVariable Long id) throws MalformedURLException {
+		FileEntity metaData = meta.exists(id);
         return ResponseEntity.ok()
-        		.header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + findMeta(id).filename + "\"")
+        		.header(HttpHeaders.CONTENT_TYPE, metaData.contentType)
+        		.header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + metaData.filename + "\"")
         		.body(files.getResource(id));
     }
 	
     @ExceptionHandler(FileNotFoundException.class)
     public ResponseEntity<?> notFound(FileNotFoundException ex) {
-        return ResponseEntity.notFound().build();
+        return ResponseEntity.status(/*Not Found*/404).body(new Object() { public String cause = ex.getMessage(); });
+    }
+	
+    @ExceptionHandler(FileIsEmptyException.class)
+    public ResponseEntity<?> noContent(FileIsEmptyException ex) {
+        return ResponseEntity.status(/*No Content*/204).body(new Object() { public String cause = ex.getMessage(); });
     }
 }
