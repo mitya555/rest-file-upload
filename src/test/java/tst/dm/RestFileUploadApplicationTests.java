@@ -2,10 +2,13 @@ package tst.dm;
 
 import static org.mockito.BDDMockito.given;
 import static org.mockito.BDDMockito.then;
+import static org.mockito.Matchers.any;
 import static org.mockito.Matchers.anyObject;
 import static org.mockito.Matchers.argThat;
+import static org.mockito.Mockito.inOrder;
 import static org.hamcrest.CoreMatchers.is;
 import static org.hamcrest.CoreMatchers.startsWith;
+import static org.junit.Assert.assertEquals;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.fileUpload;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
@@ -18,7 +21,11 @@ import java.util.TimeZone;
 
 import org.junit.Test;
 import org.junit.runner.RunWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.ArgumentMatcher;
+import org.mockito.Captor;
+import org.mockito.InOrder;
+import org.mockito.Mockito;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.json.AutoConfigureJsonTesters;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
@@ -80,11 +87,14 @@ public class RestFileUploadApplicationTests {
     	}
     }
     
+    @Captor
+    ArgumentCaptor<FileEntity> entCaptor;
+    
     @Test
     public void saveUploadedFile() throws Exception {
         TestFileEntity ent = TestFileEntity.get(null);
 
-        given(meta.save(ent))
+        given(meta.save(any(FileEntity.class)))
         		.willReturn(TestFileEntity.get(1L));
     	
         MockMultipartFile multipartFile = new MockMultipartFile("file", ent.filename, ent.contentType, ent.testContent.getBytes()),
@@ -97,9 +107,12 @@ public class RestFileUploadApplicationTests {
                 .andExpect(content().contentType(MediaType.APPLICATION_JSON_UTF8))
                 .andExpect(jsonPath("$.uri", is("/api/1")));
         
-        then(meta).should().save(ent);
+        InOrder inOrder = inOrder(meta, files);
         
-        then(files).should().save(multipartFile, 1L);
+        then(meta).should(inOrder).save(entCaptor.capture());
+        assertEquals(ent, entCaptor.getValue());
+
+        then(files).should(inOrder).save(multipartFile, 1L);
     }
     
     @Test
