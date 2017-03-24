@@ -13,8 +13,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-import java.sql.Timestamp;
-import java.time.LocalDateTime;
+import java.time.Clock;
+import java.util.TimeZone;
 
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -23,8 +23,12 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.json.AutoConfigureJsonTesters;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.boot.test.json.JacksonTester;
 import org.springframework.boot.test.mock.mockito.MockBean;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+import org.springframework.context.annotation.Primary;
 import org.springframework.core.io.ByteArrayResource;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
@@ -36,6 +40,16 @@ import org.springframework.test.web.servlet.MockMvc;
 @SpringBootTest
 @AutoConfigureMockMvc
 public class RestFileUploadApplicationTests {
+    
+    @TestConfiguration
+    static class ClockConfig {
+
+    	@Bean
+    	@Primary
+    	public Clock clock() {
+    	    return Clock.fixed(TestFileEntity.get(null).uploaded.toInstant(), TimeZone.getDefault().toZoneId());
+    	}
+    }
 
     @Autowired
     private MockMvc mvc;
@@ -48,16 +62,19 @@ public class RestFileUploadApplicationTests {
 
     private static class TestFileEntity extends FileEntity {
     	public String testCreated;
+    	public String testUploaded;
     	public String testContent;
     	public static TestFileEntity get(Long _id) {
-    		String _created = "2016-12-31T23:59:59";
+    		String _created = "2016-12-31T23:59:59", _uploaded = "1970-01-01T00:00";
     		return new TestFileEntity() {{
         		author = "John Doe";
         		contentType = "text/plain";
-        		created = Timestamp.valueOf(LocalDateTime.parse(_created));
+        		setCreated(_created);
+        		setUploaded(_uploaded);
         		filename = "test.txt";
         		id = _id;
         		testCreated = _created;
+        		testUploaded = _uploaded;
         		testContent = "Test Upload File Service";
         	}};
     	}
@@ -104,7 +121,8 @@ public class RestFileUploadApplicationTests {
                 .andExpect(content().contentType(MediaType.APPLICATION_JSON_UTF8))
                 .andExpect(jsonPath("$.author", is(ent.author)))
                 .andExpect(jsonPath("$.contentType", is(ent.contentType)))
-                .andExpect(jsonPath("$.created", is(ent.created.getTime())))
+                .andExpect(jsonPath("$.created", is(ent.testCreated)))
+                .andExpect(jsonPath("$.uploaded", is(ent.testUploaded)))
                 .andExpect(jsonPath("$.filename", is(ent.filename)))
                 .andExpect(jsonPath("$.id", is(ent.id.intValue())));
     }

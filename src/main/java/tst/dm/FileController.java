@@ -5,7 +5,7 @@ import java.net.MalformedURLException;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.sql.Timestamp;
-import java.text.SimpleDateFormat;
+import java.time.Clock;
 import java.time.LocalDateTime;
 import java.util.Optional;
 
@@ -34,6 +34,9 @@ public class FileController {
 	@Autowired
 	MetaService meta;
 	
+	@Autowired
+	Clock clock;
+	
 	@PostMapping(value={ "/", "/{id}" }, consumes="multipart/form-data")
 	ResponseEntity<?> upload(@PathVariable Optional<Long> id,
 			@RequestPart(name="file") MultipartFile file,
@@ -46,9 +49,11 @@ public class FileController {
 			return meta.exists(val);
 		}).orElse(new FileEntity());
 		ent.author = author.orElse(null);
-		ent.created = created.isPresent() ? Timestamp.valueOf(LocalDateTime.parse(created.get())) : null;
+		if (created.isPresent())
+			ent.setCreated(created.get());
 		ent.contentType = file.getContentType();
 		ent.filename = file.getOriginalFilename();
+		ent.uploaded = Timestamp.valueOf(LocalDateTime.now(clock));
 		FileEntity _ent = meta.save(ent);
 		Long _id = _ent.id;
 		files.save(file, _id);

@@ -19,7 +19,7 @@ public class FileService {
 	private Path dir;
 	
 	@Autowired
-	public FileService(FileConfig conf) throws IOException {
+	public FileService(FileConfigProps conf) throws IOException {
 		dir = Paths.get(conf.dir);
 		if (!Files.exists(dir))
 			Files.createDirectory(dir);
